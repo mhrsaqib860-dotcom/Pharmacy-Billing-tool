@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pharmacy Billing Tool</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNa5K0YB2m2w6ogv0k+eXk0B0JqzYqvT9t3n0Hd3q+Bq3G4Hb1f6i1oJ1xF9Q8tqF3jJgI8m8Pq6bqLqWkOqg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-k1mWbCgbJ+q3gq7o6N6N0g3z9c6gFQp9u4bqg9xP1kqM9e6vT8GJzR0tZk3u9cG1aH2o3q9kLzE2q2bqD3tQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+
+
+<body>
+
+    <!-- Shop Details Settings -->
+<div class="settings-box">
+    <h2>Manage Your Pharmacy</h2>
+
+    <label>Shop Name:</label>
+    <input type="text" id="shopNameInput" placeholder="Enter Your Pharmacy name">
+
+    <label>Shop Address:</label>
+    <input type="text" id="shopAddressInput" placeholder="Enter Pharmacy address">
+
+    <label>Contact Number:</label>
+    <input type="text" id="shopContactInput" placeholder="Enter contact number">
+
+    <button onclick="saveShopDetails()">Save Details</button>
+</div>
+
+
+  <header>
+    <h1>Bill And Stock Status</h1>
+  </header>
+
+  <main class="container">
+    <section class="left">
+      <h2>Manage Stock</h2>
+      <form id="stock-form">
+        <input type="text" id="product-name" placeholder="Product name" required />
+        <input type="number" id="product-rate" placeholder="Rate (per unit)" step="0.01" min="0" required />
+        <button type="submit">Add / Update Stock</button>
+      </form>
+
+      <h3>Stock Items</h3>
+      <div id="stock-list"></div>
+      <button id="clear-stock" class="danger">Clear Stock</button>
+    </section>
+
+    <section class="middle">
+      <h2>Create Bill</h2>
+      <form id="bill-form">
+        <select id="bill-product">
+          <option value="">-- Select product from stock --</option>
+        </select>
+        <input type="number" id="bill-qty" placeholder="Quantity" step="1" min="1" />
+        <button type="submit">Add to Bill</button>
+      </form>
+
+      <h3>Bill Items</h3>
+      <table id="bill-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Product</th>
+            <th>Rate</th>
+            <th>Qty</th>
+            <th>Amount</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+
+        </tbody>
+
+
+        <tfoot>
+          <tr><td colspan="4" style="text-align:right">Subtotal</td>
+            <td id="subtotal">0.00</td>
+            <td></td>
+        </tr>
+
+          <tr>
+            <td colspan="4" style="text-align:right">Discount</td>
+            <td>
+                <input type="number" id="discount" min="0" value="0" step="0.01" /></td>
+                <td>
+
+                </td>
+            </tr>
+
+          <tr>
+            <td colspan="4" style="text-align:right">Total</td>
+            <td id="grandtotal">0.00</td>
+            <td></td>
+        </tr>
+        </tfoot>
+
+
+      </table>
+
+      <div class="bill-actions">
+        <button id="generate-bill">Generate Bill</button>
+        <button id="print-bill">Print and Save Bill</button>
+        <button id="download-pdf">Download PDF</button>
+        <button id="clear-bill" class="danger">Clear Bill</button>
+      </div>
+
+
+    </section>
+
+
+    <section class="right">
+      <h2 class="CBR">Client Bill Reciept</h2>
+      <div id="bill-preview">
+
+
+
+
+                                  <!-- printable bill -->
+
+                                  <h2 id="shopName">Your Shop Name</h2>
+                                  <p id="shopAddress">Shop Address Here</p>
+                                  <p id="shopContact">Contact Number</p>
+
+        <hr/>
+        
+        <div id="bill-content">
+          <!-- Filled when Generate Bill button clicked -->
+          <p class="muted">No bill generated yet.</p>
+        </div>
+        <hr/>
+        <div id="bill-footer" class="muted">
+          <p>Thank you for your purchase!</p>
+        </div>
+        <hr>
+        <div class="dev-info">Developed By M Saqib <br> <p> 0307-0971456 </p> </div>
+      </div>
+    </section>
+  </main>
+
+
+  <footer>
+    <p>System Developed by <span>M Saqib </span> </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
