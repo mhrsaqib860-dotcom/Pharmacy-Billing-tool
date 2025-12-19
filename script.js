@@ -1,390 +1,249 @@
 
+const $ = (s) => document.querySelector(s);
+
+function toast(message, type = "success") {
+  const container = $("#toast-container");
+  const div = document.createElement("div");
+  div.className = `toast ${type}`;
+  div.innerText = message;
+  container.appendChild(div);
+
+  setTimeout(() => div.remove(), 3000);
+}
+
+function money(v) {
+  return Number(v).toFixed(2);
+}
+
+                         /*  THEME  */
+const themeSelector = $("#themeSelector");
+themeSelector.value = localStorage.getItem("theme") || "light";
+
+document.body.dataset.theme = themeSelector.value;
+
+themeSelector.addEventListener("change", () => {
+  document.body.dataset.theme = themeSelector.value;
+  localStorage.setItem("theme", themeSelector.value);
+});
+
+                                       /*  SHOP DETAILS  */
 function saveShopDetails() {
-    const name = document.getElementById("shopNameInput").value;
-    const address = document.getElementById("shopAddressInput").value;
-    const contact = document.getElementById("shopContactInput").value;
-
-    const details = {
-        name,
-        address,
-        contact
-    };
-
-    localStorage.setItem("shopDetails", JSON.stringify(details));
-    alert("Shop details saved successfully!");
-    displayShopDetails(); 
+  const details = {
+    name: $("#shopNameInput").value,
+    address: $("#shopAddressInput").value,
+    contact: $("#shopContactInput").value
+  };
+  localStorage.setItem("shopDetails", JSON.stringify(details));
+  loadShopDetails();
+  toast("Pharmacy details saved");
 }
 
+function loadShopDetails() {
+  const d = JSON.parse(localStorage.getItem("shopDetails"));
+  if (!d) return;
+  $("#shopName").innerText = d.name;
+  $("#shopAddress").innerText = d.address;
+  $("#shopContact").innerText = d.contact;
+}
 
-function displayShopDetails() {
-    const saved = JSON.parse(localStorage.getItem("shopDetails"));
+                              /*  Stock Manage  */
+let stock = JSON.parse(localStorage.getItem("stock")) || [];
 
-    if (saved) {
-        document.getElementById("shopName").innerText = saved.name || "";
-        document.getElementById("shopAddress").innerText = saved.address || "";
-        document.getElementById("shopContact").innerText = saved.contact || "";
+function saveStock() {
+  localStorage.setItem("stock", JSON.stringify(stock));
+}
+
+function stockStatus(qty) {
+  if (qty === 0) return "out";
+  if (qty <= 10) return "low";
+  return "in";
+}
+
+function renderStock(filter = "") {
+  const box = $("#stock-list");
+  box.innerHTML = "";
+
+  stock
+    .filter(s => s.name.toLowerCase().includes(filter.toLowerCase()))
+    .forEach((s, i) => {
+      box.innerHTML += `
+        <div class="stock-item">
+          <div>
+            <strong>${s.name}</strong><br>
+            <small>Rate: ${money(s.rate)} | Qty: ${s.qty}</small>
+          </div>
+          <span class="badge ${stockStatus(s.qty)}">${stockStatus(s.qty)}</span>
+        </div>
+      `;
+    });
+
+  renderProductDropdown();
+}
+
+$("#stock-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+
+  const name = $("#product-name").value.trim();
+  const rate = Number($("#product-rate").value);
+  const qty = Number($("#product-qty").value);
+
+  if (!name || rate < 0 || qty < 0) {
+    toast("Invalid stock details", "error");
+    return;
+  }
+
+  const existing = stock.find(s => s.name === name);
+  if (existing) {
+    existing.rate = rate;
+    existing.qty += qty;
+    toast("Stock updated");
+  } else {
+    stock.push({ name, rate, qty });
+    toast("Medicine added to stock");
+  }
+
+  saveStock();
+  renderStock();
+  e.target.reset();
+});
+
+$("#clear-stock").addEventListener("click", () => {
+  if (!confirm("Clear all stock?")) return;
+  stock = [];
+  saveStock();
+  renderStock();
+});
+
+                                    /*  Search  */
+$("#stock-search").addEventListener("input", e => {
+  renderStock(e.target.value);
+});
+
+                                       /*  Bill */
+let bill = [];
+
+function renderProductDropdown() {
+  const select = $("#bill-product");
+  select.innerHTML = `<option value="">Select medicine</option>`;
+  stock.forEach(s => {
+    if (s.qty > 0) {
+      select.innerHTML += `<option value="${s.name}">${s.name}</option>`;
     }
-}
-
-// Load shop details when page opens
-window.onload = function() {
-    displayShopDetails();
-};
-
-
-
-
-const $ = (sel) => document.querySelector(sel);
-const $all = (sel) => document.querySelectorAll(sel);
-
-// Load stock from localStorage
-function loadStock(){
-  const raw = localStorage.getItem('pharmacy_stock');
-  try {
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error('Invalid stock data in localStorage, clearing it.');
-    localStorage.removeItem('pharmacy_stock');
-    return [];
-  }
-}
-function saveStock(stock){
-  localStorage.setItem('pharmacy_stock', JSON.stringify(stock));
-}
-
-// UI elements
-const stockForm = $('#stock-form');
-const productNameInput = $('#product-name');
-const productRateInput = $('#product-rate');
-const stockListEl = $('#stock-list');
-const clearStockBtn = $('#clear-stock');
-
-const billForm = $('#bill-form');
-const billProductSelect = $('#bill-product');
-const billQtyInput = $('#bill-qty');
-const billTableBody = $('#bill-table tbody');
-const subtotalEl = $('#subtotal');
-const discountInput = $('#discount');
-const grandtotalEl = $('#grandtotal');
-
-const generateBillBtn = $('#generate-bill');
-const printBillBtn = $('#print-bill');
-const downloadPdfBtn = $('#download-pdf');
-const clearBillBtn = $('#clear-bill');
-
-const billPreview = $('#bill-preview');
-const billContent = $('#bill-content');
-
-
-let billItems = []; 
-
-
-function init(){
-  renderStock();
-  renderBillProductsDropdown();
-  renderBillTable();
-}
-
-function renderStock(){
-  const stock = loadStock();
-  stockListEl.innerHTML = '';
-  if(stock.length === 0){
-    stockListEl.innerHTML = '<p class="muted">No stock items yet.</p>';
-    return;
-  }
-  stock.forEach((item, idx) => {
-    const div = document.createElement('div');
-    div.className = 'stock-item';
-    div.innerHTML = `
-      <div>
-        <strong>${escapeHtml(item.name)}</strong><br />
-        <span class="muted">Rate: ${formatMoney(item.rate)}</span>
-      </div>
-      <div>
-        <button class="small-btn" data-edit="${idx}">Edit</button>
-        <button class="small-btn" data-delete="${idx}">Delete</button>
-      </div>
-    `;
-    stockListEl.appendChild(div);
-  });
-
-  stockListEl.querySelectorAll('[data-edit]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(e.target.getAttribute('data-edit'));
-      editStockItem(idx);
-    });
-  });
-  stockListEl.querySelectorAll('[data-delete]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(e.target.getAttribute('data-delete'));
-      deleteStockItem(idx);
-    });
-  });
- 
-  renderBillProductsDropdown();
-}
-
-function renderBillProductsDropdown(){
-  const stock = loadStock();
-  billProductSelect.innerHTML = '<option value="">-- Select product from stock --</option>';
-  stock.forEach(item => {
-    const opt = document.createElement('option');
-    opt.value = item.name;
-    opt.textContent = `${item.name} — ${formatMoney(item.rate)}`;
-    billProductSelect.appendChild(opt);
   });
 }
 
-
-stockForm.addEventListener('submit', (e) => {
+$("#bill-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const name = productNameInput.value.trim();
-  const rate = parseFloat(productRateInput.value);
-  if(!name || isNaN(rate) || rate < 0){
-    alert('Please enter valid product name and rate.');
+
+  const name = $("#bill-product").value;
+  const qty = Number($("#bill-qty").value);
+  const med = stock.find(s => s.name === name);
+
+  if (!med) {
+    toast("Medicine not found", "error");
+    return;
+  }
+  if (qty > med.qty) {
+    toast("Not enough stock", "warn");
     return;
   }
 
-  let stock = loadStock();
-  
-  const idx = stock.findIndex(s => s.name.toLowerCase() === name.toLowerCase());
-  if(idx >= 0){
-   
-    stock[idx].rate = rate;
-    alert('Updated existing product rate in stock.');
+  const existing = bill.find(b => b.name === name);
+  if (existing) {
+    existing.qty += qty;
   } else {
-    stock.push({ name, rate });
-    alert('Added product to stock.');
+    bill.push({ name, rate: med.rate, qty });
   }
-  saveStock(stock);
-  productNameInput.value = '';
-  productRateInput.value = '';
-  renderStock();
+
+  renderBill();
+  $("#bill-qty").value = "";
 });
 
-clearStockBtn.addEventListener('click', () => {
-  if(!confirm('Clear entire stock? This cannot be undone.')) return;
-  localStorage.removeItem('pharmacy_stock');
-  renderStock();
-  renderBillProductsDropdown();
-});
+function renderBill() {
+  const body = $("#bill-table tbody");
+  body.innerHTML = "";
 
-
-function editStockItem(index){
-  const stock = loadStock();
-  if(!stock[index]) return;
-  productNameInput.value = stock[index].name;
-  productRateInput.value = stock[index].rate;
- 
-  stock.splice(index, 1);
-  saveStock(stock);
-  renderStock();
-}
-function deleteStockItem(index){
-  if(!confirm('Delete this stock item?')) return;
-  const stock = loadStock();
-  if(!stock[index]) return;
-  stock.splice(index, 1);
-  saveStock(stock);
-  renderStock();
-}
-
-
-billForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const selectedName = billProductSelect.value;
-  const qty = parseInt(billQtyInput.value);
-  if(!selectedName){
-    alert('Select a product from stock.');
-    return;
-  }
-  if(isNaN(qty) || qty <= 0){
-    alert('Enter a valid quantity (1 or more).');
-    return;
-  }
-  const stock = loadStock();
-  const prod = stock.find(s => s.name === selectedName);
-  if(!prod){
-    alert('Product not found in stock (it might have been removed).');
-    return;
-  }
-  addToBill(prod.name, prod.rate, qty);
-  billQtyInput.value = '';
-});
-
-
-function addToBill(name, rate, qty){
-  const idx = billItems.findIndex(it => it.name === name);
-  if(idx >= 0){
-    billItems[idx].qty += qty;
-    billItems[idx].amount = +(billItems[idx].rate * billItems[idx].qty).toFixed(2);
-  } else {
-    const amount = +(rate * qty).toFixed(2);
-    billItems.push({ name, rate, qty, amount });
-  }
-  renderBillTable();
-}
-
-
-function renderBillTable(){
-  billTableBody.innerHTML = '';
   let subtotal = 0;
-  billItems.forEach((it, i) => {
-    subtotal += it.amount;
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${i+1}</td>
-      <td>${escapeHtml(it.name)}</td>
-      <td>${formatMoney(it.rate)}</td>
-      <td>${it.qty}</td>
-      <td>${formatMoney(it.amount)}</td>
-      <td>
-        <button class="small-btn" data-remove="${i}">Remove</button>
-      </td>
+
+  bill.forEach((b, i) => {
+    const amt = b.qty * b.rate;
+    subtotal += amt;
+
+    body.innerHTML += `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${b.name}</td>
+        <td>${money(b.rate)}</td>
+        <td>${b.qty}</td>
+        <td>${money(amt)}</td>
+        <td><button onclick="removeBill(${i})">×</button></td>
+      </tr>
     `;
-    billTableBody.appendChild(row);
   });
-  subtotal = +subtotal.toFixed(2);
-  subtotalEl.textContent = formatMoney(subtotal);
-  
-  const discount = parseFloat(discountInput.value) || 0;
-  let total = subtotal - discount;
-  if(total < 0) total = 0;
-  grandtotalEl.textContent = formatMoney(total);
- 
-  billTableBody.querySelectorAll('[data-remove]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(e.target.getAttribute('data-remove'));
-      billItems.splice(idx, 1);
-      renderBillTable();
-    });
-  });
+
+  $("#subtotal").innerText = money(subtotal);
+  const discount = Number($("#discount").value) || 0;
+  $("#grandtotal").innerText = money(subtotal - discount);
 }
 
-// discount change -> recalc
-discountInput.addEventListener('input', renderBillTable);
+function removeBill(i) {
+  bill.splice(i, 1);
+  renderBill();
+}
 
-// Generate bill (populate preview area)
-generateBillBtn.addEventListener('click', (e) => {
-  if(billItems.length === 0){
-    alert('Add items to the bill first.');
+$("#discount").addEventListener("input", renderBill);
+
+/* ================= GENERATE BILL ================= */
+$("#generate-bill").addEventListener("click", () => {
+  if (!bill.length) {
+    toast("Bill is empty", "warn");
     return;
   }
-  const subtotal = parseFloat(subtotalEl.textContent) || 0;
-  const discount = parseFloat(discountInput.value) || 0;
-  const total = parseFloat(grandtotalEl.textContent) || 0;
 
-  // create bill HTML
-  const date = new Date().toLocaleString();
-  let html = `<div><strong>Bill Date:</strong> ${escapeHtml(date)}</div>`;
-  html += '<table style="width:100%; margin-top:8px; border-collapse:collapse;">';
-  html += '<thead><tr><th>#</th><th>Product</th><th>Rate</th><th>Qty</th><th>Amount</th></tr></thead><tbody>';
-  billItems.forEach((it, i) => {
+  bill.forEach(b => {
+    const med = stock.find(s => s.name === b.name);
+    med.qty -= b.qty;
+  });
+
+  saveStock();
+  renderStock();
+
+  let html = `<p>Date: ${new Date().toLocaleString()}</p><table>`;
+  html += `<tr><th>Medicine</th><th>Qty</th><th>Rate</th><th>Total</th></tr>`;
+  bill.forEach(b => {
     html += `<tr>
-      <td style="padding:6px;">${i+1}</td>
-      <td style="padding:6px;">${escapeHtml(it.name)}</td>
-      <td style="padding:6px;">${formatMoney(it.rate)}</td>
-      <td style="padding:6px;">${it.qty}</td>
-      <td style="padding:6px;">${formatMoney(it.amount)}</td>
+      <td>${b.name}</td>
+      <td>${b.qty}</td>
+      <td>${money(b.rate)}</td>
+      <td>${money(b.qty * b.rate)}</td>
     </tr>`;
   });
-  html += `</tbody></table>`;
-  html += `<div style="text-align:right; margin-top:8px;">
-    <div>Subtotal: <strong>${formatMoney(subtotal)}</strong></div>
-    <div>Discount: <strong>${formatMoney(discount)}</strong></div>
-    <div style="font-size:1.1em; margin-top:6px;">Total: <strong>${formatMoney(total)}</strong></div>
-  </div>`;
+  html += `</table>
+           <p>Total: <strong>${$("#grandtotal").innerText}</strong></p>`;
 
-  billContent.innerHTML = html;
-  // optional: scroll to preview
-  billPreview.scrollIntoView({ behavior: 'smooth' });
+  $("#bill-content").innerHTML = html;
+  toast("Bill generated");
 });
 
-// Print bill using browser print (only the bill-preview area)
-printBillBtn.addEventListener('click', () => {
-  // open new window with bill content for printing
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
-  const style = `<style>
-    body{font-family: Arial, sans-serif; padding:20px}
-    table{width:100%; border-collapse: collapse}
-    td, th{padding:6px; border-bottom:1px solid #e6e6e6}
-  </style>`;
-  printWindow.document.write('<html><head><title>Print Bill</title>' + style + '</head><body>');
-  printWindow.document.write(billPreview.innerHTML);
-  printWindow.document.write('</body></html>');
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+                                /*  Print & pdf */
+$("#print-bill").addEventListener("click", () => window.print());
+
+$("#download-pdf").addEventListener("click", async () => {
+  const canvas = await html2canvas($("#bill-preview"), { scale: 2 });
+  const img = canvas.toDataURL("image/png");
+  const pdf = new jspdf.jsPDF();
+  pdf.addImage(img, "PNG", 10, 10, 190, 0);
+  pdf.save("bill.pdf");
 });
 
-// Download PDF: use html2canvas + jsPDF
-downloadPdfBtn.addEventListener('click', async () => {
-  // ensure there is something generated
-  if(billContent.innerHTML.trim() === '' || billContent.innerHTML.includes('No bill')){
-    alert('Generate the bill first, then download as PDF.');
-    return;
-  }
-  // Use html2canvas to capture the billPreview
-  const node = billPreview;
-  // increase scale for better quality
-  const scale = 2;
-  const canvas = await html2canvas(node, { scale, useCORS: true });
-  const imgData = canvas.toDataURL('image/png');
-  const pdf = new jspdf.jsPDF('p', 'pt', 'a4'); // points
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-
-  // calculate image dimensions to fit A4
-  const imgWidth = pageWidth - 40; // margins
-  const ratio = canvas.width / canvas.height;
-  const imgHeight = imgWidth / ratio;
-
-  let position = 20;
-  pdf.addImage(imgData, 'PNG', 20, position, imgWidth, imgHeight);
-  // if content overflows a page, add more pages
-  let remainingHeight = imgHeight;
-  let pageCanvasHeight = pageHeight - 40;
-  if(imgHeight > pageCanvasHeight){
-    // break into multiple pages (simple approach: scale page by page)
-    // For most simple bills this won't be needed, but code kept for safety.
-    // (Advanced splitting requires slicing canvas; omitted for brevity)
-  }
-  pdf.save(`bill_${Date.now()}.pdf`);
+                                         /* Clear bill */
+$("#clear-bill").addEventListener("click", () => {
+  bill = [];
+  renderBill();
+  $("#bill-content").innerHTML = `<p class="muted">No bill generated yet.</p>`;
+  toast("Bill cleared", "warn");
 });
 
-// Clear bill
-clearBillBtn.addEventListener('click', () => {
-  if(!confirm('Clear current bill items?')) return;
-  billItems = [];
-  renderBillTable();
-  billContent.innerHTML = '<p class="muted">No bill generated yet.</p>';
-});
-
-// small utility helpers
-function formatMoney(num){
-  // show two decimals, safe arithmetic
-  return (+num).toFixed(2);
-}
-function escapeHtml(unsafe){
-  return String(unsafe)
-    .replaceAll('&','&amp;')
-    .replaceAll('<','&lt;')
-    .replaceAll('>','&gt;')
-    .replaceAll('"','&quot;')
-    .replaceAll("'","&#039;");
-}
-
-// initialize
-init();
-
-// Extra: Load sample data if stock is empty (for beginners to try quickly)
-if(loadStock().length === 0){
-  const sample = [
-    {name:'Paracetamol 500mg', rate:45.00},
-    {name:'Cough Syrup 100ml', rate:120.50},
-    {name:'Vitamin C 100mg', rate:85.00}
-  ];
-  saveStock(sample);
-  renderStock();
-  renderBillProductsDropdown();
-}
+                           /*  Initilization */
+loadShopDetails();
+renderStock();
